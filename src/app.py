@@ -5,17 +5,12 @@ from langchain_core.runnables import RunnablePassthrough
 from langchain_core.output_parsers import StrOutputParser
 from langchain_community.utilities import SQLDatabase
 from langchain_community.tools import InfoSQLDatabaseTool
-from langchain_community.chat_models import ChatOpenAI
 from langchain.prompts import ChatPromptTemplate
 from langchain_groq import ChatGroq
-import openai
 import streamlit as st
 
 # Load environment variables
 load_dotenv()
-
-# Initialize the ChatOpenAI model
-#hat = ChatOpenAI(api_key=os.environ["OPENAI_API_KEY"], temperature=0.7)
 
 #Initialize UI
 st.set_page_config(page_title="Chat PTO", page_icon=":speech_balloon")
@@ -47,7 +42,10 @@ if 'Schema' not in st.session_state:
     st.session_state['Schema'] = None
 
 if 'Email' not in st.session_state:
-    st.session_state['Email'] = "john.doe@acme.com"
+    st.session_state['Email'] = None
+
+if 'db' not in st.session_state:
+    st.session_state['db'] = None
 
 def init_database(user: str, password: str, host: str, port: str, database: str) -> SQLDatabase:
     db_uri = f"mysql+mysqlconnector://{user}:{password}@{host}:{port}/{database}"
@@ -61,7 +59,7 @@ def get_reduced_schema(db):
 
     return st.session_state.Schema
 
-def get_sql_chain():
+def get_sql_script():
     generate_script_prompt = ChatPromptTemplate.from_template("""
         You are a assistant data analyst at a company, specializing in SQL queries and database management. You interact with users who ask questions about the company’s database.
         Based on the provided table schema, generate a SQL query that accurately answers the user's question. 
@@ -77,7 +75,7 @@ def get_sql_chain():
         For example:
         Q: How many available PTO's do I have?
         A: SELECT ptobalance.AvailablePTO FROM ptobalance JOIN employee ON ptobalance.EmployeeID = employee.EmployeeID WHERE employee.Email = '{user_email}';
-        Q: Someone ask for a PTO request for 2024-11-20?
+        Q: Someone from my team ask for a PTO request for 2024-11-20?
         A: SELECT employee.FirstName, employee.LastName, client.Name, COUNT(*) FROM ptorequest JOIN employee ON ptorequest.EmployeeID = employee.EmployeeID JOIN client ON client.ClientID = employee.ClientID WHERE employee.ClientID = (SELECT employee.ClientID FROM employee WHERE employee.Email = '{user_email}') and employee.Email != '{user_email}' and '2024-11-20' BETWEEN ptorequest.StartDate and ptorequest.EndDate GROUP BY employee.FirstName, employee.LastName, client.Name;
                                                                                                                     
         Q: {question}
@@ -95,7 +93,7 @@ def get_sql_chain():
     )
 
 def get_response(user_query: str, db: SQLDatabase, chat_history: list, user_email: str):
-    sql_chain = get_sql_chain()
+    sql_chain = get_sql_script()
 
     generate_user_response_prompt = ChatPromptTemplate.from_template("""
         You are an assistant data analyst at a company, specializing in SQL queries and database management. Your task is to respond to user queries based on the company's database.
@@ -105,10 +103,10 @@ def get_response(user_query: str, db: SQLDatabase, chat_history: list, user_emai
         Conversation History: {chat_history}
         SQL Query: <SQL>{query}</SQL>
         User Question: {question}
-        SQL Response: {response}"""
+        SQL Response: {response}
+        """
     )
     
-    # llm = ChatOpenAI(model="gpt-4-0125-preview")
     llm = ChatGroq(model="mixtral-8x7b-32768", temperature=0)
     
     chain = (
@@ -128,14 +126,18 @@ def get_response(user_query: str, db: SQLDatabase, chat_history: list, user_emai
     })
 
 def get_user_data():
-    st.session_state.db
-    if st.session_state.Email is not None:
+    if st.session_state.Email is not None and st.session_state.db is not None:
         db = st.session_state.db
-        cursor = db.cursor()
-        query = "SELECT employee.FirstName, employee.LastName FROM team_ptos.employee where employee.Email = '" + st.session_state.Email + "'"
-        cursor.execute(query)
-        user_data = cursor.fetchall()
-        print(user_data)
+        user_data = db.run("SELECT employee.FirstName, employee.LastName FROM team_ptos.employee where employee.Email = '" + st.session_state.Email + "'")
+        if user_data != "":
+            userDataList = eval(user_data)
+            firstUser = userDataList[0]
+            st.session_state.FirstName = firstUser[0]
+            st.session_state.LastName = firstUser[1]
+        else:
+            st.session_state.FirstName = ""
+            st.session_state.LastName = ""
+            st.error("User does not exists", icon="🚨")
 
 with st.sidebar:
     col1, col2 = st.columns(2)
@@ -144,10 +146,33 @@ with st.sidebar:
     with col2:
         st.image("C:\git\Training\AI\ChatPTO\src\images\paperPlane.png", width=80)
     st.subheader("", divider="orange")
-    st.write("Please fill your data",)
-    st.text_input("Email", value="john.doe@acme.com", key='Email', on_change=get_user_data)
-    st.text_input("First Name", value="John")
-    st.text_input("Last Name", value="Doe")
+    st.write("Please connect first to the database!")
+    if st.button("Connect"):
+       with st.spinner("Connecting to the database..."):
+            db = init_database(
+                st.session_state["User"],
+                st.session_state["Password"],
+                st.session_state["Host"],
+                st.session_state["Port"],
+                st.session_state["Database"]
+            )
+            st.session_state.db = db
+            txt="Connected to database! ✅"    
+            htmlstr1=f"""<p style='background-color:green;
+                color:white;
+                font-size:1rem;
+                border-radius:5px;
+                line-height:60px;
+                padding-left:17px;'>
+                {txt}</style>
+                <br></p>""" 
+            st.markdown(htmlstr1,unsafe_allow_html=True) 
+
+    st.subheader("", divider="orange")
+    st.text_input("Email", key='Email', on_change=get_user_data)
+    st.text_input("First Name", key="FirstName", disabled=True)
+    st.text_input("Last Name", key="LastName", disabled=True)
+    #st.error("User does not exists" )
     st.markdown("""
     <style>
         div.st-emotion-cache-6qob1r.eczjsme3 {
@@ -166,20 +191,12 @@ with st.sidebar:
             width: 100px;
             height: 50px;
         }
+        .st-emotion-cache-13ejsyy:hover{
+            border-color: orange;
+            color:white; 
+        }
     </style>
     """, unsafe_allow_html=True)
-
-    if st.button("Connect"):
-       with st.spinner("Connecting to the database..."):
-            db = init_database(
-                st.session_state["User"],
-                st.session_state["Password"],
-                st.session_state["Host"],
-                st.session_state["Port"],
-                st.session_state["Database"]
-            )
-            st.session_state.db = db
-            st.success("Connected to database!")
 
 for message in st.session_state.chat_history:
     if isinstance(message, AIMessage):
