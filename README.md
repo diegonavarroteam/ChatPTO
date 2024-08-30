@@ -78,19 +78,13 @@ ChatPTO uses a relational database schema with the following tables:
 
 This diagram was just design to recreate an initial Demo:
 
+![screenshot](https://github.com/diegonavarroteam/ChatPTO/blob/main/src/images/DatabaseDiagram.png)
 
-## Contributing
+## AI Integration
+Chat PTO operates by processing natural language queries submitted through the user interface (UI). Utilizing advanced AI tools such as OpenAI or Groq, these queries are translated into SQL queries. The system then executes the SQL query against the database to retrieve the relevant information. After obtaining the data, the AI tool is used once more to translate the query results into a natural language response, which is then presented to the user via the UI.
 
-We welcome contributions to improve ChatPTO! Please follow these steps:
-
-1. Fork the repository.
-2. Create a new branch for your feature or bugfix.
-3. Submit a pull request with a detailed description of the changes.
+The interaction with the AI tool involves two distinct prompts: the first generates the SQL query to extract the necessary information from the database, and the second formulates a clear, natural language response to the user based on the data returned by the initial query. In both queries, we incorporate the database schema from the relevant tables as a foundational knowledge base for the AI tool. This ensures the generation of more accurate and contextually appropriate responses.
 
 ## License
 
-This project is licensed under the MIT License. See the [LICENSE](LICENSE) file for more details.
-
----
-
-*Note: This README assumes a basic structure for the ChatPTO project. Please adjust paths, commands, and details as necessary to fit the actual project structure.*
+This project is licensed under the MIT License. See the [LICENSE](LICENSE) file for more details. For testing pruporses you can use [Grooq](https://groq.com/) to generate a free API KEY to interact with the AI tool. 
