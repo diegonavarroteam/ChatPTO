@@ -77,7 +77,9 @@ def get_sql_script():
         A: SELECT ptobalance.AvailablePTO FROM ptobalance JOIN employee ON ptobalance.EmployeeID = employee.EmployeeID WHERE employee.Email = '{user_email}';
         Q: Someone from my team ask for a PTO request for 2024-11-20?
         A: SELECT employee.FirstName, employee.LastName, client.Name, COUNT(*) FROM ptorequest JOIN employee ON ptorequest.EmployeeID = employee.EmployeeID JOIN client ON client.ClientID = employee.ClientID WHERE employee.ClientID = (SELECT employee.ClientID FROM employee WHERE employee.Email = '{user_email}') and employee.Email != '{user_email}' and '2024-11-20' BETWEEN ptorequest.StartDate and ptorequest.EndDate GROUP BY employee.FirstName, employee.LastName, client.Name;
-                                                                                                                    
+        Q: What is my team?
+        A: SELECT employee.Name FROM employee WHERE employee.Email = '{user_email}'
+                                                                                                                                                                          
         Q: {question}
         A:
         """
@@ -98,7 +100,8 @@ def get_response(user_query: str, db: SQLDatabase, chat_history: list, user_emai
     generate_user_response_prompt = ChatPromptTemplate.from_template("""
         You are an assistant data analyst at a company, specializing in SQL queries and database management. Your task is to respond to user queries based on the company's database.
         Given the table schema, the user's question, the SQL query generated, and the query's result, craft a clear and informative natural language response to the user. 
-
+        Do not show process, breakdown or SQL source, just the answer.
+                                                                     
         <SCHEMA>{schema}</SCHEMA>
         Conversation History: {chat_history}
         SQL Query: <SQL>{query}</SQL>
