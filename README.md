@@ -53,7 +53,7 @@ To get started with ChatPTO, follow these steps:
 6. Set up the database:
 
     - Ensure you have MySQL installed and running.
-    - Run the querys in the folder src to create tables and data:
+    - Run the querys in the folder src to create tables and data [here](https://github.com/diegonavarroteam/ChatPTO/tree/main/scripts)
 
 ## Usage
 
@@ -84,6 +84,9 @@ This diagram was just design to recreate an initial Demo:
 Chat PTO operates by processing natural language queries submitted through the user interface (UI). Utilizing advanced AI tools such as OpenAI or Groq, these queries are translated into SQL queries. The system then executes the SQL query against the database to retrieve the relevant information. After obtaining the data, the AI tool is used once more to translate the query results into a natural language response, which is then presented to the user via the UI.
 
 The interaction with the AI tool involves two distinct prompts: the first generates the SQL query to extract the necessary information from the database, and the second formulates a clear, natural language response to the user based on the data returned by the initial query. In both queries, we incorporate the database schema from the relevant tables as a foundational knowledge base for the AI tool. This ensures the generation of more accurate and contextually appropriate responses.
+
+Consider the follow diagram to see the integration with the AI tools:
+![screenshot](https://github.com/diegonavarroteam/ChatPTO/blob/main/src/images/AIIntegrationDiagram.png)
 
 ## License
 
