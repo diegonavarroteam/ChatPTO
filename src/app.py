@@ -62,24 +62,27 @@ def get_reduced_schema(db):
 def get_sql_script():
     generate_script_prompt = ChatPromptTemplate.from_template("""
         You are a assistant data analyst at a company, specializing in SQL queries and database management. You interact with users who ask questions about the company’s database.
-        Based on the provided table schema, generate a SQL query that accurately answers the user's question. 
+        Based on the provided table schema, generate a SQL cript that only performs read operations on a database that accurately answers the user's question. 
         Your query should focus solely on reading data related to the employee.Email {user_email}. 
-        
         Consider the entire conversation history to ensure the query aligns with the user's context and intent.
         
         <SCHEMA>{schema}</SCHEMA>
         Conversation History: {chat_history}
         
-        Write only the SQL query and nothing else. Do not wrap the SQL query in any other text, not even backticks.
+        Rules:
+        The queries include different clauses like WHERE, JOIN, ORDER BY, GROUP BY, and LIMIT, but do not perform any operations that modify the data (e.g., DELETE, INSERT, UPDATE)
+        Write only the SQL query and nothing else.
+        Just used the provided tables and columns in schema to create the query. 
+        Do not wrap the SQL query in any other text, not even backticks.
 
         For example:
         Q: How many available PTO's do I have?
         A: SELECT ptobalance.AvailablePTO FROM ptobalance JOIN employee ON ptobalance.EmployeeID = employee.EmployeeID WHERE employee.Email = '{user_email}';
+        Q: What is my team?
+        A: SELECT client.Name FROM employee JOIN client ON client.ClientID = employee.ClientID WHERE employee.Email = '{user_email}'
         Q: Someone from my team ask for a PTO request for 2024-11-20?
         A: SELECT employee.FirstName, employee.LastName, client.Name, COUNT(*) FROM ptorequest JOIN employee ON ptorequest.EmployeeID = employee.EmployeeID JOIN client ON client.ClientID = employee.ClientID WHERE employee.ClientID = (SELECT employee.ClientID FROM employee WHERE employee.Email = '{user_email}') and employee.Email != '{user_email}' and '2024-11-20' BETWEEN ptorequest.StartDate and ptorequest.EndDate GROUP BY employee.FirstName, employee.LastName, client.Name;
-        Q: What is my team?
-        A: SELECT employee.Name FROM employee WHERE employee.Email = '{user_email}'
-                                                                                                                                                                          
+        
         Q: {question}
         A:
         """
@@ -99,19 +102,24 @@ def get_response(user_query: str, db: SQLDatabase, chat_history: list, user_emai
 
     generate_user_response_prompt = ChatPromptTemplate.from_template("""
         You are an assistant data analyst at a company, specializing in SQL queries and database management. Your task is to respond to user queries based on the company's database.
-        Given the table schema, the user's question, the SQL query generated, and the query's result, craft a clear and informative natural language response to the user. 
-        Do not show process, breakdown or SQL source, just the answer.
+        Given the table schema, the user's question, the SQL query generated, and the query's result, craft a clear and informative natural language response to the user. Use an informal and friendly tone. 
+        Do not show process, breakdown or SQL source, table names, just the answer.
                                                                      
         <SCHEMA>{schema}</SCHEMA>
         Conversation History: {chat_history}
         SQL Query: <SQL>{query}</SQL>
         User Question: {question}
         SQL Response: {response}
+        
+        For example:
+        User Question: Someone from my team ask PTO request for this week?
+        SQL Response:
+        A: Based on your query, I found that there is no PTO request from someone on your team for this week.  
         """
     )
     
     llm = ChatGroq(model="mixtral-8x7b-32768", temperature=0)
-    
+
     chain = (
         RunnablePassthrough.assign(query=sql_chain).assign(
             response=lambda vars: db.run(vars["query"]),
@@ -120,7 +128,7 @@ def get_response(user_query: str, db: SQLDatabase, chat_history: list, user_emai
         | llm
         | StrOutputParser()
     )
-    
+
     return chain.invoke({
         "question": user_query,
         "chat_history": chat_history,
@@ -145,9 +153,9 @@ def get_user_data():
 with st.sidebar:
     col1, col2 = st.columns(2)
     with col1:
-        st.image("C:\git\Training\AI\ChatPTO\src\images\logoTeam.png", width=160)
+        st.image(r"C:\git\Training\AI\ChatPTO\src\images\logoTeam.png", width=160)
     with col2:
-        st.image("C:\git\Training\AI\ChatPTO\src\images\paperPlane.png", width=80)
+        st.image(r"C:\git\Training\AI\ChatPTO\src\images\paperPlane.png", width=80)
     st.subheader("", divider="orange")
     st.write("Please connect first to the database!")
     if st.button("Connect"):
@@ -175,7 +183,6 @@ with st.sidebar:
     st.text_input("Email", key='Email', on_change=get_user_data)
     st.text_input("First Name", key="FirstName", disabled=True)
     st.text_input("Last Name", key="LastName", disabled=True)
-    #st.error("User does not exists" )
     st.markdown("""
     <style>
         div.st-emotion-cache-6qob1r.eczjsme3 {
